@@ -18,6 +18,8 @@ export interface AssetItem {
   userConstraint?: string;
   detailedRationale?: string;
   switchTarget?: string;
+  recommendedAmountTHB?: number;
+  recommendedUnitsStr?: string;
 }
 
 export interface PortfolioSummary {
@@ -30,29 +32,18 @@ export interface PortfolioSummary {
   assetCount: number;
 }
 
-export interface CategoryAllocation {
-  name: string;
-  value: number;
-  percentage: number;
-  color: string;
+export interface MarketResearchHighlight {
+  title: string;
+  source: string;
+  url: string;
+  detail: string;
 }
 
-export interface BrokerAllocation {
-  name: string;
-  value: number;
-  percentage: number;
-}
-
-export interface RebalanceRecommendation {
+export interface NewAssetRecommendation {
   assetName: string;
   assetClass: string;
   broker: string;
-  action: 'Buy' | 'Sell' | 'Hold' | 'Switch';
-  currentWeight: number;
-  targetWeight: number;
-  variance: number;
-  estimatedAmountTHB: number;
+  recommendedAmountTHB: number;
   reason: string;
-  constraint?: string;
-  switchTarget?: string;
+  sourceUrl: string;
 }

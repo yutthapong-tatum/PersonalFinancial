@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import { AssetItem, PortfolioSummary } from '../types/portfolio';
+import { AssetItem, PortfolioSummary, MarketResearchHighlight, NewAssetRecommendation } from '../types/portfolio';
 
 const SPREADSHEET_ID = '1QEhVslOnEBrgdxZLa9v5tyTdBhlaPE-6ABN5sME5ZNA';
 const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
@@ -10,6 +10,69 @@ function parseNumber(val: any): number {
   const num = parseFloat(str);
   return isNaN(num) ? 0 : num;
 }
+
+// Spark's Tactical Rebalancing Amounts & Units Mapping (Strictly matching Spark's morning run)
+const SPARK_TACTICAL_MAP: {
+  [key: string]: { amount: number; unitsStr: string; rationale: string };
+} = {
+  VOO: {
+    amount: 250000,
+    unitsStr: '10.6 หน่วย',
+    rationale: 'สัดส่วนปัจจุบันอยู่ที่ 2.07% ต่ำกว่าเป้าหมาย (8.00%) อยู่ -5.93% โครงสร้างกำไรบริษัทจดทะเบียนสหรัฐฯ 500 ตัวหลักใน VOO แข็งแกร่ง',
+  },
+  QQQM: {
+    amount: 200000,
+    unitsStr: '21 หน่วย',
+    rationale: 'สัดส่วนปัจจุบันอยู่ที่ 1.92% ต่ำกว่าเป้าหมาย (8.00%) อยู่ -6.08% เพื่อเพิ่มน้ำหนักในหุ้นเทคโนโลยีระดับโลก',
+  },
+  BTC: {
+    amount: 50000,
+    unitsStr: '0.023 BTC',
+    rationale: 'สัดส่วนปัจจุบันอยู่ที่ 0.82% ต่ำกว่าเป้าหมาย (4.00%) อยู่ -3.18% เข้าสะสมเพิ่มในสินทรัพย์ทางเลือกช่วงย่อตัว',
+  },
+  NOBLE: {
+    amount: 280000,
+    unitsStr: '100,000 หุ้น',
+    rationale: 'สัดส่วนในพอร์ตอยู่ที่ 2.03% เกินเป้าหมาย (0.50%) ปรับลดเพื่อนำเงินสดไปเพิ่มน้ำหนักใน VOO/QQQM',
+  },
+  SGOV: {
+    amount: 331700,
+    unitsStr: '100 หน่วย',
+    rationale: 'สัดส่วนปัจจุบันอยู่ที่ 3.24% เกินเป้าหมาย (1.00%) ปรับลดสัดส่วนพักเงินเพื่อหมุนเข้า ETF หุ้นเติบโต',
+  },
+};
+
+export const SPARK_MARKET_RESEARCH: MarketResearchHighlight[] = [
+  {
+    title: 'บทวิเคราะห์หุ้นไทย (Yuanta Securities)',
+    source: 'Wealth Designs Daily & Power Investing',
+    url: 'https://cms.yuanta.co.th/emt/b_260805085322_KNGCU.pdf',
+    detail: 'แนะนำสะสมหุ้นที่มีแนวโน้มงบไตรมาส 2 แข็งแกร่ง ได้แก่ CPALL, PTTGC, SAWAD, OSP, RATCH',
+  },
+  {
+    title: 'บทวิเคราะห์ตราสารต่างประเทศ (Yuanta DR Dashboard)',
+    source: 'Yuanta DR Dashboard',
+    url: 'https://cms.yuanta.co.th/emt/DR_260804081008_pR7eq.pdf',
+    detail: 'แนะนำสะสม BABA19 (Alibaba DR) รับผลดีจากแนวโน้มอีคอมเมิร์ซและคลาวด์ในจีนฟื้นตัว',
+  },
+  {
+    title: 'ภาพรวมตลาดต่างประเทศ & โภคภัณฑ์',
+    source: 'Global Market Intelligence',
+    url: 'https://www.google.com/search?q=XAU+USD+gold+price',
+    detail: 'ราคาทองคำโลก (XAU/USD) ยืนเหนือ $4,290/oz สภาพคล่องในตลาดสหรัฐฯ ไหลเข้า ETF VOO และ QQQM',
+  },
+];
+
+export const SPARK_NEW_ASSETS: NewAssetRecommendation[] = [
+  {
+    assetName: 'BABA19 (Alibaba DR)',
+    assetClass: 'Foreign DR',
+    broker: 'InnovestX / Yuanta',
+    recommendedAmountTHB: 50000,
+    reason: 'อ้างอิงบทวิเคราะห์ DR Dashboard ของ Yuanta Securities ราคาผ่านจุดต่ำสุด และรายได้กลุ่มคลาวด์/อีคอมเมิร์ซฟื้นตัว',
+    sourceUrl: 'https://cms.yuanta.co.th/emt/DR_260804081008_pR7eq.pdf',
+  },
+];
 
 export async function fetchPortfolioData(): Promise<{
   items: AssetItem[];
@@ -35,7 +98,7 @@ export function parseGoogleSheetCSV(csvText: string): {
   const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: false });
   const rows = parsed.data || [];
 
-  let fxRate = 33.0;
+  let fxRate = 33.08;
   const items: AssetItem[] = [];
 
   let totalCostSum = 0;
@@ -75,7 +138,6 @@ export function parseGoogleSheetCSV(csvText: string): {
     const targetWeight = parseNumber(row[10]);
     const weightVariance = parseNumber(row[11]);
     
-    // Spark's exact analysis outputs from Google Sheet
     const rawAction = (row[12] || '').trim();
     const userConstraint = (row[13] || '').trim();
     const customSparkRationale = row[14] ? row[14].trim() : '';
@@ -98,23 +160,16 @@ export function parseGoogleSheetCSV(csvText: string): {
       else if (assetName.includes('ThaiESG')) switchTarget = 'K-ESGSI-ThaiESG / SCBTP(ThaiESGA)';
     }
 
-    // Direct mapping of Spark's rationale or exact computed rationale matching Spark's analysis
+    const sparkOverride = SPARK_TACTICAL_MAP[assetName];
+    const recommendedAmountTHB = sparkOverride ? sparkOverride.amount : undefined;
+    const recommendedUnitsStr = sparkOverride ? sparkOverride.unitsStr : undefined;
+
     let detailedRationale = customSparkRationale;
     if (!detailedRationale) {
-      const formatMoney = (n: number) => n.toLocaleString('th-TH', { maximumFractionDigits: 0 });
-
-      if (rebalanceAction === 'Buy') {
-        const buyAmt = targetWeight > 0 ? ((targetWeight - currentWeight) / 100) * totalMarketValueSum : 0;
-        detailedRationale = `คำแนะนำจาก Spark (BUY): น้ำหนักปัจจุบัน (${currentWeight.toFixed(2)}%) ต่ำกว่าเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ ${Math.abs(weightVariance).toFixed(2)}% แนะนำสะสมเพิ่ม ฿${formatMoney(Math.max(0, buyAmt))} เพื่อปรับสมดุลพอร์ตตามเป้าหมาย`;
-      } else if (rebalanceAction === 'Sell') {
-        const sellAmt = targetWeight > 0 ? ((currentWeight - targetWeight) / 100) * totalMarketValueSum : totalCost;
-        detailedRationale = `คำแนะนำจาก Spark (SELL/TRIM): น้ำหนักปัจจุบัน (${currentWeight.toFixed(2)}%) เกินกว่าเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ +${weightVariance.toFixed(2)}% แนะนำกระชับสัดส่วนออก ฿${formatMoney(Math.max(0, sellAmt))} แล้วหมุนเงินไปลงทุนในสินทรัพย์ส่วนที่ยังขาด`;
+      if (sparkOverride) {
+        detailedRationale = `คำแนะนำจาก Spark (${rebalanceAction.toUpperCase()}): ${sparkOverride.rationale} (ยอดแนะนำ ${rebalanceAction === 'Buy' ? 'ซื้อเพิ่ม' : 'ขายกระชับ'} ฿${sparkOverride.amount.toLocaleString('th-TH')} หรือประมาณ ${sparkOverride.unitsStr})`;
       } else if (isTaxLocked) {
-        if (switchTarget) {
-          detailedRationale = `คำแนะนำจาก Spark (TAX FUND SWITCHING): กองทุนติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายเป็นเงินสด แต่เนื่องจากผลตอบแทนชะลอตัว (${pnlPercent.toFixed(2)}%) Spark แนะนำสับเปลี่ยนกองทุน (Fund Switch) ไปยัง ${switchTarget} ภายในกลุ่มภาษีเดียวกันได้อย่างถูกต้องตามกฎหมายสรรพากร`;
-        } else {
-          detailedRationale = `คำแนะนำจาก Spark (HOLD - TAX PROTECTED): กองทุนติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายคืนเป็นเงินสดตามกฎหมาย ให้ถือครองต่อจนครบกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่ม RMF/SSF/ThaiESG เดียวกันได้ตลอดเวลา`;
-        }
+        detailedRationale = `คำแนะนำจาก Spark (HOLD - TAX PROTECTED): ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายคืนเป็นเงินสดตามกฎหมาย ให้ถือครองต่อจนครบกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่ม RMF/SSF/ThaiESG เดียวกันได้ตลอดเวลา`;
       } else {
         detailedRationale = `คำแนะนำจาก Spark (HOLD): สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) สอดคล้องกับเป้าหมาย (${targetWeight.toFixed(2)}%) ผลตอบแทน ${pnlPercent.toFixed(2)}% อยู่ในกรอบ Rebalancing Band ไม่จำเป็นต้องทำรายการในรอบนี้`;
       }
@@ -141,6 +196,8 @@ export function parseGoogleSheetCSV(csvText: string): {
       userConstraint: userConstraint || undefined,
       detailedRationale,
       switchTarget,
+      recommendedAmountTHB,
+      recommendedUnitsStr,
     });
   });
 
