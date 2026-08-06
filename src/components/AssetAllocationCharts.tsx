@@ -15,7 +15,21 @@ import {
   Legend,
 } from 'recharts';
 import { AssetItem } from '../types/portfolio';
-import { PieChart as PieIcon, BarChart3, Building2, ShieldAlert } from 'lucide-react';
+import {
+  PieChart as PieIcon,
+  BarChart3,
+  Building2,
+  Building,
+  Globe,
+  Briefcase,
+  Lock,
+  HeartHandshake,
+  Shield,
+  Coins,
+  Zap,
+  Landmark,
+  Layers,
+} from 'lucide-react';
 
 interface ChartsProps {
   items: AssetItem[];
@@ -33,6 +47,18 @@ const CATEGORY_COLORS: { [key: string]: string } = {
 };
 
 const DEFAULT_COLOR = '#64748B';
+
+const renderCategoryIcon = (fullName: string) => {
+  if (fullName.includes('Thai Stocks')) return <Building className="w-3.5 h-3.5 text-blue-400" />;
+  if (fullName.includes('Foreign ETFs')) return <Globe className="w-3.5 h-3.5 text-purple-400" />;
+  if (fullName.includes('Mutual Funds')) return <Briefcase className="w-3.5 h-3.5 text-emerald-400" />;
+  if (fullName.includes('Tax-Saving')) return <Lock className="w-3.5 h-3.5 text-amber-400" />;
+  if (fullName.includes('Insurance')) return <HeartHandshake className="w-3.5 h-3.5 text-pink-400" />;
+  if (fullName.includes('Fixed Income')) return <Shield className="w-3.5 h-3.5 text-cyan-400" />;
+  if (fullName.includes('Gold')) return <Coins className="w-3.5 h-3.5 text-yellow-400" />;
+  if (fullName.includes('Crypto')) return <Zap className="w-3.5 h-3.5 text-orange-400" />;
+  return <Layers className="w-3.5 h-3.5 text-slate-400" />;
+};
 
 export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
   const [activeTab, setActiveTab] = useState<'category' | 'broker' | 'rebalance'>('category');
@@ -73,7 +99,6 @@ export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
 
   // 3. Current vs Target Weight comparison data
   const rebalanceData = categoryData.map((cat) => {
-    // Sum current and target weights for this category
     const catItems = items.filter((i) => i.assetClass === cat.fullName);
     const currentWeight = catItems.reduce((acc, curr) => acc + curr.currentWeight, 0);
     const targetWeight = catItems.reduce((acc, curr) => acc + curr.targetWeight, 0);
@@ -97,9 +122,12 @@ export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
       const data = payload[0].payload;
       return (
         <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs space-y-1 border border-slate-700">
-          <p className="font-bold text-sm text-slate-100">{data.fullName || data.name}</p>
-          <p className="text-emerald-400 font-semibold">{formatCurrency(data.value)}</p>
-          <p className="text-slate-300">{data.percentage.toFixed(2)}% of total portfolio</p>
+          <p className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+            {data.fullName && renderCategoryIcon(data.fullName)}
+            {data.fullName || data.name}
+          </p>
+          <p className="text-emerald-400 font-black">{formatCurrency(data.value)}</p>
+          <p className="text-slate-300 font-semibold">{data.percentage.toFixed(2)}% of total portfolio</p>
         </div>
       );
     }
@@ -111,7 +139,7 @@ export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
       {/* Header and Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-700">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
             <PieIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             Portfolio Allocation & Visual Analytics
           </h2>
@@ -121,10 +149,10 @@ export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl gap-1 self-start sm:self-auto">
+        <div className="flex bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl gap-1 self-start sm:self-auto border border-slate-200 dark:border-slate-700">
           <button
             onClick={() => setActiveTab('category')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
               activeTab === 'category'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -135,7 +163,7 @@ export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
           </button>
           <button
             onClick={() => setActiveTab('broker')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
               activeTab === 'broker'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -146,7 +174,7 @@ export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
           </button>
           <button
             onClick={() => setActiveTab('rebalance')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
               activeTab === 'rebalance'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -230,18 +258,23 @@ export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
 
         {/* Right Side: Data Breakdown Legend */}
         <div className="lg:col-span-5 space-y-2 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
-          <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-            {activeTab === 'category'
-              ? 'Category Breakdown'
-              : activeTab === 'broker'
-              ? 'Broker Account Distribution'
-              : 'Category Target Summary'}
+          <div className="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+            <span>
+              {activeTab === 'category'
+                ? 'Category Breakdown'
+                : activeTab === 'broker'
+                ? 'Broker Distribution'
+                : 'Category Target Summary'}
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 font-bold">
+              {activeTab === 'category' ? categoryData.length : brokerData.length} Items
+            </span>
           </div>
 
-          {(activeTab === 'category' ? categoryData : brokerData).map((item, idx) => (
+          {(activeTab === 'category' ? categoryData : brokerData).map((item: any, idx: number) => (
             <div
               key={idx}
-              className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+              className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors border border-slate-100 dark:border-slate-700/50"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <span
@@ -249,20 +282,27 @@ export const AssetAllocationCharts: React.FC<ChartsProps> = ({ items }) => {
                   style={{
                     backgroundColor:
                       activeTab === 'category'
-                        ? (item as any).color
+                        ? item.color
                         : `hsl(${(idx * 55) % 360}, 70%, 55%)`,
                   }}
                 />
-                <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
-                  {item.name}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {activeTab === 'category' ? (
+                    renderCategoryIcon(item.fullName)
+                  ) : (
+                    <Landmark className="w-3.5 h-3.5 text-indigo-400" />
+                  )}
+                  <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate">
+                    {item.name}
+                  </span>
+                </div>
               </div>
 
               <div className="text-right flex-shrink-0 pl-2">
-                <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                <span className="text-xs font-black text-slate-900 dark:text-white block">
                   {formatCurrency(item.value)}
                 </span>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
                   {item.percentage.toFixed(2)}%
                 </span>
               </div>
