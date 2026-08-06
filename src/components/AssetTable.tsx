@@ -26,9 +26,12 @@ import {
   Landmark,
   ArrowUpRight,
   ArrowDownRight,
-  ListFilter,
-  DollarSign,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Repeat,
   Tag,
+  DollarSign,
 } from 'lucide-react';
 
 interface AssetTableProps {
@@ -63,6 +66,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedBroker, setSelectedBroker] = useState<string>('ALL');
   const [selectedAction, setSelectedAction] = useState<string>('ALL');
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   const [sortField, setSortField] = useState<SortField>('marketValue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -88,6 +92,10 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
       setSortField(field);
       setSortDirection('desc');
     }
+  };
+
+  const toggleRow = (id: string) => {
+    setExpandedRowId((prev) => (prev === id ? null : id));
   };
 
   const filteredItems = useMemo(() => {
@@ -183,7 +191,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
               Live Portfolio Asset Inventory ({filteredItems.length} Assets)
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Comprehensive inventory with visual badges, cost basis, market prices, and target weights
+              คลิกที่แถวใดก็ได้เพื่อดู **เหตุผลประกอบเจาะลึกและสิทธิประโยชน์ภาษี** ของสินทรัพย์นั้นๆ
             </p>
           </div>
 
@@ -193,14 +201,13 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
               className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 self-start sm:self-auto hover:scale-[1.02]"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              View Action Summary Modal
+              ดูเหตุผลเจาะลึกแบบเต็มทุกตัว
             </button>
           )}
         </div>
 
         {/* Search & Filter Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 pt-1">
-          {/* Search Box */}
           <div className="relative lg:col-span-4">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
@@ -212,7 +219,6 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
             />
           </div>
 
-          {/* Category Filter */}
           <div className="lg:col-span-3">
             <select
               value={selectedCategory}
@@ -228,7 +234,6 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
             </select>
           </div>
 
-          {/* Broker Filter */}
           <div className="lg:col-span-3">
             <select
               value={selectedBroker}
@@ -244,7 +249,6 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
             </select>
           </div>
 
-          {/* Action Filter */}
           <div className="lg:col-span-2">
             <select
               value={selectedAction}
@@ -338,111 +342,137 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
             ) : (
               filteredItems.map((item) => {
                 const isProfit = item.pnlPercent >= 0;
+                const isExpanded = expandedRowId === item.id;
+
                 return (
-                  <tr
-                    key={item.id}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition-colors"
-                  >
-                    {/* Asset Name & Category */}
-                    <td className="py-3.5 px-4">
-                      <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                        {renderCategoryIcon(item.assetClass)}
-                        <span>{item.assetName}</span>
-                        {item.userConstraint && (
-                          <span
-                            title={item.userConstraint}
-                            className="p-1 rounded-md bg-amber-50 dark:bg-amber-900/40 text-amber-600 border border-amber-200 dark:border-amber-800"
-                          >
-                            <Lock className="w-3 h-3" />
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate max-w-[200px] font-semibold mt-0.5">
-                        {item.assetClass.split('(')[0].trim()}
-                      </div>
-                    </td>
+                  <React.Fragment key={item.id}>
+                    <tr
+                      onClick={() => toggleRow(item.id)}
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3.5 px-4">
+                        <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                          {renderCategoryIcon(item.assetClass)}
+                          <span>{item.assetName}</span>
+                          {item.userConstraint && (
+                            <span
+                              title={item.userConstraint}
+                              className="p-1 rounded-md bg-amber-50 dark:bg-amber-900/40 text-amber-600 border border-amber-200 dark:border-amber-800"
+                            >
+                              <Lock className="w-3 h-3" />
+                            </span>
+                          )}
+                          {isExpanded ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-indigo-500" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate max-w-[200px] font-semibold mt-0.5">
+                          {item.assetClass.split('(')[0].trim()}
+                        </div>
+                      </td>
 
-                    {/* Broker */}
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg font-bold bg-slate-100 dark:bg-slate-700/80 text-slate-800 dark:text-slate-200 text-[11px] border border-slate-200 dark:border-slate-600">
-                        <Landmark className="w-3 h-3 mr-1.5 text-indigo-500" />
-                        {item.broker || 'N/A'}
-                      </span>
-                    </td>
-
-                    {/* Units & Price */}
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="font-extrabold text-slate-900 dark:text-white">
-                        {item.units > 0 ? item.units.toLocaleString('en-US') : '-'}
-                      </div>
-                      <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
-                        {item.currentPrice > 0 ? `@ ฿${item.currentPrice.toLocaleString('en-US')}` : '-'}
-                      </div>
-                    </td>
-
-                    {/* Total Cost */}
-                    <td className="py-3.5 px-4 text-right font-extrabold text-slate-700 dark:text-slate-300">
-                      {formatTHB(item.totalCost)}
-                    </td>
-
-                    {/* Market Value */}
-                    <td className="py-3.5 px-4 text-right font-black text-slate-900 dark:text-white">
-                      {formatTHB(item.marketValue)}
-                    </td>
-
-                    {/* P&L % and Amount */}
-                    <td className="py-3.5 px-4 text-right">
-                      <div
-                        className={`font-black inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${
-                          isProfit
-                            ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200'
-                            : 'bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-200'
-                        }`}
-                      >
-                        {isProfit ? (
-                          <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <ArrowDownRight className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                        )}
-                        {item.pnlPercent.toFixed(2)}%
-                      </div>
-                      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">
-                        {formatTHB(item.marketValue - item.totalCost)}
-                      </div>
-                    </td>
-
-                    {/* Current vs Target Weight */}
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5 font-extrabold">
-                        <span className="text-slate-900 dark:text-white">
-                          {item.currentWeight.toFixed(2)}%
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg font-bold bg-slate-100 dark:bg-slate-700/80 text-slate-800 dark:text-slate-200 text-[11px] border border-slate-200 dark:border-slate-600">
+                          <Landmark className="w-3 h-3 mr-1.5 text-indigo-500" />
+                          {item.broker || 'N/A'}
                         </span>
-                        <span className="text-slate-300 dark:text-slate-600">/</span>
-                        <span className="text-slate-500 dark:text-slate-400">
-                          {item.targetWeight > 0 ? `${item.targetWeight.toFixed(2)}%` : '-'}
-                        </span>
-                      </div>
-                      {item.targetWeight > 0 && (
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="font-extrabold text-slate-900 dark:text-white">
+                          {item.units > 0 ? item.units.toLocaleString('en-US') : '-'}
+                        </div>
+                        <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                          {item.currentPrice > 0 ? `@ ฿${item.currentPrice.toLocaleString('en-US')}` : '-'}
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right font-extrabold text-slate-700 dark:text-slate-300">
+                        {formatTHB(item.totalCost)}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right font-black text-slate-900 dark:text-white">
+                        {formatTHB(item.marketValue)}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
                         <div
-                          className={`text-[10px] font-bold ${
-                            item.weightVariance > 0
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : item.weightVariance < 0
-                              ? 'text-indigo-600 dark:text-indigo-400'
-                              : 'text-slate-400'
+                          className={`font-black inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${
+                            isProfit
+                              ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200'
+                              : 'bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-200'
                           }`}
                         >
-                          Var: {item.weightVariance > 0 ? '+' : ''}
-                          {item.weightVariance.toFixed(2)}%
+                          {isProfit ? (
+                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <ArrowDownRight className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                          )}
+                          {item.pnlPercent.toFixed(2)}%
                         </div>
-                      )}
-                    </td>
+                        <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">
+                          {formatTHB(item.marketValue - item.totalCost)}
+                        </div>
+                      </td>
 
-                    {/* Rebalance Action */}
-                    <td className="py-3.5 px-4 text-center">
-                      {getActionBadge(item.rebalanceAction, item.userConstraint)}
-                    </td>
-                  </tr>
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5 font-extrabold">
+                          <span className="text-slate-900 dark:text-white">
+                            {item.currentWeight.toFixed(2)}%
+                          </span>
+                          <span className="text-slate-300 dark:text-slate-600">/</span>
+                          <span className="text-slate-500 dark:text-slate-400">
+                            {item.targetWeight > 0 ? `${item.targetWeight.toFixed(2)}%` : '-'}
+                          </span>
+                        </div>
+                        {item.targetWeight > 0 && (
+                          <div
+                            className={`text-[10px] font-bold ${
+                              item.weightVariance > 0
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : item.weightVariance < 0
+                                ? 'text-indigo-600 dark:text-indigo-400'
+                                : 'text-slate-400'
+                            }`}
+                          >
+                            Var: {item.weightVariance > 0 ? '+' : ''}
+                            {item.weightVariance.toFixed(2)}%
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        {getActionBadge(item.rebalanceAction, item.userConstraint)}
+                      </td>
+                    </tr>
+
+                    {/* Expandable Rationale Details Row */}
+                    {isExpanded && (
+                      <tr className="bg-indigo-50/50 dark:bg-indigo-950/20 border-b border-indigo-200 dark:border-indigo-800">
+                        <td colSpan={8} className="p-4">
+                          <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 space-y-2">
+                            <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs">
+                              <Info className="w-4 h-4" />
+                              <span>ที่มาของข้อมูล & เหตุผลวิเคราะห์ประกอบคำแนะนำสำหรับ {item.assetName}:</span>
+                            </div>
+
+                            <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                              {item.detailedRationale}
+                            </p>
+
+                            {item.switchTarget && (
+                              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-300 font-bold flex items-center gap-2">
+                                <Repeat className="w-4 h-4 text-amber-600" />
+                                <span>เป้าหมายการสับเปลี่ยนกองทุนลดหย่อนภาษีที่แนะนำ: {item.switchTarget}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}

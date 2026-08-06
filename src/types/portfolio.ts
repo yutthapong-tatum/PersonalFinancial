@@ -1,4 +1,4 @@
-export type RebalanceActionType = 'Buy' | 'Sell' | 'Hold' | string;
+export type RebalanceActionType = 'Buy' | 'Sell' | 'Hold' | 'Switch' | string;
 
 export interface AssetItem {
   id: string;
@@ -16,6 +16,8 @@ export interface AssetItem {
   weightVariance: number;
   rebalanceAction: RebalanceActionType;
   userConstraint?: string;
+  detailedRationale?: string;
+  switchTarget?: string;
 }
 
 export interface PortfolioSummary {
@@ -45,11 +47,12 @@ export interface RebalanceRecommendation {
   assetName: string;
   assetClass: string;
   broker: string;
-  action: 'Buy' | 'Sell' | 'Hold';
+  action: 'Buy' | 'Sell' | 'Hold' | 'Switch';
   currentWeight: number;
   targetWeight: number;
   variance: number;
   estimatedAmountTHB: number;
   reason: string;
   constraint?: string;
+  switchTarget?: string;
 }

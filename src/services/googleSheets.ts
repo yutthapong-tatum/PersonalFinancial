@@ -44,7 +44,6 @@ export function parseGoogleSheetCSV(csvText: string): {
   rows.forEach((row, index) => {
     if (!row || row.length === 0) return;
 
-    // Check for FX Rate line
     const firstColStr = (row[0] || '').trim();
     if (firstColStr.includes('FX Rate')) {
       const val = parseNumber(row[1]);
@@ -52,7 +51,6 @@ export function parseGoogleSheetCSV(csvText: string): {
       return;
     }
 
-    // Skip Header rows and total summary row
     if (
       firstColStr.includes('Asset Class') ||
       firstColStr.includes('Investment Portfolio Tracker') ||
@@ -65,7 +63,6 @@ export function parseGoogleSheetCSV(csvText: string): {
     const assetName = (row[1] || '').trim();
     const broker = (row[2] || '').trim();
 
-    // Skip empty asset rows
     if (!assetName || !assetClass) return;
 
     const units = parseNumber(row[3]);
@@ -80,12 +77,44 @@ export function parseGoogleSheetCSV(csvText: string): {
     const rawAction = (row[12] || '').trim();
     const userConstraint = (row[13] || '').trim();
 
-    // Standardize rebalance action
-    let rebalanceAction: 'Buy' | 'Sell' | 'Hold' | string = 'Hold';
+    let rebalanceAction: 'Buy' | 'Sell' | 'Hold' | 'Switch' | string = 'Hold';
     const lowerAction = rawAction.toLowerCase();
     if (lowerAction.includes('buy')) rebalanceAction = 'Buy';
     else if (lowerAction.includes('sell')) rebalanceAction = 'Sell';
     else if (rawAction) rebalanceAction = rawAction;
+
+    // Check for tax locked switching opportunity
+    const isTaxLocked =
+      userConstraint.includes('Tax Lock') ||
+      userConstraint.includes('ห้ามขาย') ||
+      assetClass.includes('Tax-Saving');
+
+    let switchTarget: string | undefined = undefined;
+    if (isTaxLocked && (pnlPercent < -20 || (marketValue === 0 && totalCost > 0))) {
+      if (assetName.includes('RMF')) switchTarget = 'SCBRMS&P500 / SCBRMNDQ(A)';
+      else if (assetName.includes('SSF')) switchTarget = 'SCBS&P500-SSF / SCBSE-SSF';
+      else if (assetName.includes('ThaiESG')) switchTarget = 'K-ESGSI-ThaiESG / SCBTP(ThaiESGA)';
+    }
+
+    // Build explicit rationale for every asset
+    let detailedRationale = '';
+    const formatMoney = (n: number) => n.toLocaleString('th-TH', { maximumFractionDigits: 0 });
+
+    if (rebalanceAction === 'Buy') {
+      const buyAmt = targetWeight > 0 ? ((targetWeight - currentWeight) / 100) * totalMarketValueSum : 0;
+      detailedRationale = `คำแนะนำ BUY: น้ำหนักปัจจุบัน (${currentWeight.toFixed(2)}%) ต่ำกว่าเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ ${Math.abs(weightVariance).toFixed(2)}% คิดเป็นยอดซื้อเพิ่มประมาณ ฿${formatMoney(Math.max(0, buyAmt))} เพื่อปรับสัดส่วนให้สอดคล้องกับพอร์ตเป้าหมาย`;
+    } else if (rebalanceAction === 'Sell') {
+      const sellAmt = targetWeight > 0 ? ((currentWeight - targetWeight) / 100) * totalMarketValueSum : totalCost;
+      detailedRationale = `คำแนะนำ SELL/TRIM: น้ำหนักปัจจุบัน (${currentWeight.toFixed(2)}%) สูงกว่าเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ +${weightVariance.toFixed(2)}% คิดเป็นยอดกระชับสัดส่วนประมาณ ฿${formatMoney(Math.max(0, sellAmt))} เพื่อดึงเงินหมุนไปลงทุนในสินทรัพย์ที่มีน้ำหนักขาด`;
+    } else if (isTaxLocked) {
+      if (switchTarget) {
+        detailedRationale = `คำแนะนำ TAX FUND SWITCHING: ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายคืนเป็นเงินสด แต่เนื่องจากผลตอบแทนติดลบสูง (${pnlPercent.toFixed(2)}%) แนะนำให้ทำการสับเปลี่ยนกองทุน (Fund Switch) ไปยัง ${switchTarget} ภายในสถาบันเพื่อโอกาสฟื้นตัว โดยไม่ผิดกฎหมายสรรพากร`;
+      } else {
+        detailedRationale = `คำแนะนำ HOLD (TAX PROTECTED): ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายคืนเป็นเงินสดตามกฎหมายสรรพากร ให้ถือครองต่อจนครบกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่ม RMF/SSF/ThaiESG เดียวกันได้ตลอดเวลา`;
+      }
+    } else {
+      detailedRationale = `คำแนะนำ HOLD: สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) ใกล้เคียงกับเป้าหมาย (${targetWeight.toFixed(2)}%) ผลตอบแทนปัจจุบัน ${pnlPercent.toFixed(2)}% อยู่ในกรอบความเสี่ยงที่เหมาะสม ไม่จำเป็นต้องปรับสัดส่วนในรอบนี้`;
+    }
 
     totalCostSum += totalCost;
     totalMarketValueSum += marketValue;
@@ -106,6 +135,8 @@ export function parseGoogleSheetCSV(csvText: string): {
       weightVariance,
       rebalanceAction,
       userConstraint: userConstraint || undefined,
+      detailedRationale,
+      switchTarget,
     });
   });
 
