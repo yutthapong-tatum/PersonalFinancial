@@ -4,14 +4,10 @@ import React, { useState, useMemo } from 'react';
 import { AssetItem } from '../types/portfolio';
 import {
   Search,
-  Filter,
   ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   Lock,
   Layers,
   Building,
-  Building2,
   Globe,
   Briefcase,
   HeartHandshake,
@@ -32,6 +28,7 @@ import {
   Repeat,
   Tag,
   DollarSign,
+  FileText,
 } from 'lucide-react';
 
 interface AssetTableProps {
@@ -111,9 +108,9 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
         const matchesBroker = selectedBroker === 'ALL' || item.broker === selectedBroker;
         const matchesAction =
           selectedAction === 'ALL' ||
-          (selectedAction === 'Buy' && item.rebalanceAction.toLowerCase().includes('buy')) ||
-          (selectedAction === 'Sell' && item.rebalanceAction.toLowerCase().includes('sell')) ||
-          (selectedAction === 'Hold' && item.rebalanceAction.toLowerCase().includes('hold'));
+          (selectedAction === 'BUY' && item.rebalanceAction.toLowerCase().includes('buy')) ||
+          (selectedAction === 'SELL' && item.rebalanceAction.toLowerCase().includes('sell')) ||
+          (selectedAction === 'HOLD' && item.rebalanceAction.toLowerCase().includes('hold'));
 
         return matchesSearch && matchesCategory && matchesBroker && matchesAction;
       })
@@ -141,6 +138,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
     }).format(val);
   };
 
+  // High-Contrast Color Theme: Soft Green (#D1E7DD fill / #0F5132 text), Soft Red (#F8D7DA fill / #842029 text), Soft Gray (#E2E3E5 fill / #383D41 text)
   const getActionBadge = (actionStr: string, constraint?: string) => {
     const lower = actionStr.toLowerCase();
     const isTaxLock = constraint?.includes('Tax Lock') || constraint?.includes('ห้ามขาย');
@@ -180,6 +178,34 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
     );
   };
 
+  const getConstraintBadge = (constraint?: string) => {
+    if (!constraint) return null;
+
+    if (constraint.includes('ห้ามขาย') || constraint.includes('Tax Lock')) {
+      return (
+        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300/60 flex items-center gap-1">
+          <Lock className="w-3 h-3" />
+          {constraint}
+        </span>
+      );
+    }
+
+    if (constraint.includes('ห้ามซื้อเพิ่ม')) {
+      return (
+        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border border-rose-300/60 flex items-center gap-1">
+          <Scissors className="w-3 h-3" />
+          {constraint}
+        </span>
+      );
+    }
+
+    return (
+      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300/60">
+        {constraint}
+      </span>
+    );
+  };
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/80 overflow-hidden mb-8">
       {/* Table Header Controls */}
@@ -188,10 +214,10 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
               <Layers className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              Live Portfolio Asset Inventory ({filteredItems.length} Assets)
+              Full Portfolio Asset Inventory (Columns A to P - {filteredItems.length} Assets)
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              คลิกที่แถวใดก็ได้เพื่อดู **เหตุผลประกอบเจาะลึกและสิทธิประโยชน์ภาษี** ของสินทรัพย์นั้นๆ
+              ข้อมูลเชื่อมตรงจาก Google Sheet SSOT รวมข้อจำกัดส่วนบุคคล (Col N), ยอดปรับสัดส่วน (Col O) และเหตุผลประกอบ (Col P)
             </p>
           </div>
 
@@ -201,7 +227,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
               className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 self-start sm:self-auto hover:scale-[1.02]"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              ดูเหตุผลเจาะลึกแบบเต็มทุกตัว
+              ดูแผนปรับพอร์ตรายตัวทั้งหมด
             </button>
           )}
         </div>
@@ -256,9 +282,9 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
               className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 font-black"
             >
               <option value="ALL">⚡ All Actions</option>
-              <option value="Buy">🛒 BUY Only</option>
-              <option value="Sell">✂️ SELL Only</option>
-              <option value="Hold">⏸️ HOLD Only</option>
+              <option value="BUY">🛒 BUY Only</option>
+              <option value="SELL">✂️ SELL Only</option>
+              <option value="HOLD">⏸️ HOLD Only</option>
             </select>
           </div>
         </div>
@@ -275,7 +301,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
               >
                 <div className="flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-indigo-500" />
-                  Asset & Category
+                  Asset & Constraint (A, B, N)
                   <ArrowUpDown className="w-3 h-3" />
                 </div>
               </th>
@@ -285,28 +311,18 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
               >
                 <div className="flex items-center gap-1.5">
                   <Landmark className="w-3.5 h-3.5 text-indigo-500" />
-                  Broker
+                  Broker (C)
                   <ArrowUpDown className="w-3 h-3" />
                 </div>
               </th>
-              <th className="py-3.5 px-4 text-right">Units / Price</th>
-              <th
-                className="py-3.5 px-4 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white"
-                onClick={() => handleSort('totalCost')}
-              >
-                <div className="flex items-center justify-end gap-1.5">
-                  <Coins className="w-3.5 h-3.5 text-blue-500" />
-                  Total Cost
-                  <ArrowUpDown className="w-3 h-3" />
-                </div>
-              </th>
+              <th className="py-3.5 px-4 text-right">Units & Cost (D, E, F)</th>
               <th
                 className="py-3.5 px-4 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white"
                 onClick={() => handleSort('marketValue')}
               >
                 <div className="flex items-center justify-end gap-1.5">
                   <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                  Market Value
+                  Market Value (G, H)
                   <ArrowUpDown className="w-3 h-3" />
                 </div>
               </th>
@@ -316,7 +332,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
               >
                 <div className="flex items-center justify-end gap-1.5">
                   <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
-                  Unrealized P&L
+                  P&L % (I)
                   <ArrowUpDown className="w-3 h-3" />
                 </div>
               </th>
@@ -325,11 +341,12 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
                 onClick={() => handleSort('currentWeight')}
               >
                 <div className="flex items-center justify-center gap-1.5">
-                  Current vs Target
+                  Weight vs Target (J, K, L)
                   <ArrowUpDown className="w-3 h-3" />
                 </div>
               </th>
-              <th className="py-3.5 px-4 text-center">Action</th>
+              <th className="py-3.5 px-4 text-center">Action (M)</th>
+              <th className="py-3.5 px-4 text-left">Suggested Action Amount (O)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 text-xs">
@@ -354,22 +371,17 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
                         <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                           {renderCategoryIcon(item.assetClass)}
                           <span>{item.assetName}</span>
-                          {item.userConstraint && (
-                            <span
-                              title={item.userConstraint}
-                              className="p-1 rounded-md bg-amber-50 dark:bg-amber-900/40 text-amber-600 border border-amber-200 dark:border-amber-800"
-                            >
-                              <Lock className="w-3 h-3" />
-                            </span>
-                          )}
                           {isExpanded ? (
                             <ChevronUp className="w-3.5 h-3.5 text-indigo-500" />
                           ) : (
                             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate max-w-[200px] font-semibold mt-0.5">
-                          {item.assetClass.split('(')[0].trim()}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold">
+                            {item.assetClass.split('(')[0].trim()}
+                          </span>
+                          {getConstraintBadge(item.userConstraint)}
                         </div>
                       </td>
 
@@ -382,33 +394,34 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
 
                       <td className="py-3.5 px-4 text-right">
                         <div className="font-extrabold text-slate-900 dark:text-white">
-                          {item.units > 0 ? item.units.toLocaleString('en-US') : '-'}
+                          {item.units > 0 ? item.units.toLocaleString('en-US') : '-'} units
+                        </div>
+                        <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                          Cost: {formatTHB(item.totalCost)}
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="font-black text-slate-900 dark:text-white">
+                          {formatTHB(item.marketValue)}
                         </div>
                         <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
                           {item.currentPrice > 0 ? `@ ฿${item.currentPrice.toLocaleString('en-US')}` : '-'}
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-4 text-right font-extrabold text-slate-700 dark:text-slate-300">
-                        {formatTHB(item.totalCost)}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right font-black text-slate-900 dark:text-white">
-                        {formatTHB(item.marketValue)}
-                      </td>
-
                       <td className="py-3.5 px-4 text-right">
                         <div
                           className={`font-black inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${
                             isProfit
-                              ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200'
-                              : 'bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-200'
+                              ? 'bg-[#D1E7DD] text-[#0F5132] dark:bg-[#0F5132]/60 dark:text-emerald-200'
+                              : 'bg-[#F8D7DA] text-[#842029] dark:bg-[#842029]/60 dark:text-rose-200'
                           }`}
                         >
                           {isProfit ? (
-                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <ArrowUpRight className="w-3.5 h-3.5" />
                           ) : (
-                            <ArrowDownRight className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                            <ArrowDownRight className="w-3.5 h-3.5" />
                           )}
                           {item.pnlPercent.toFixed(2)}%
                         </div>
@@ -446,20 +459,24 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
                       <td className="py-3.5 px-4 text-center">
                         {getActionBadge(item.rebalanceAction, item.userConstraint)}
                       </td>
+
+                      <td className="py-3.5 px-4 text-left font-black text-slate-900 dark:text-white">
+                        {item.suggestedActionAmount || '-'}
+                      </td>
                     </tr>
 
-                    {/* Expandable Rationale Details Row */}
+                    {/* Expandable Rationale Row (Col P) */}
                     {isExpanded && (
                       <tr className="bg-indigo-50/50 dark:bg-indigo-950/20 border-b border-indigo-200 dark:border-indigo-800">
                         <td colSpan={8} className="p-4">
                           <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 space-y-2">
                             <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs">
                               <Info className="w-4 h-4" />
-                              <span>ที่มาของข้อมูล & เหตุผลวิเคราะห์ประกอบคำแนะนำสำหรับ {item.assetName}:</span>
+                              <span>Column P - Recommendation Rationale ({item.assetName}):</span>
                             </div>
 
                             <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
-                              {item.detailedRationale}
+                              {item.recommendationRationale}
                             </p>
 
                             {item.switchTarget && (

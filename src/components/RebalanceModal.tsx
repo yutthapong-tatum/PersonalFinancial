@@ -44,7 +44,7 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                คำแนะนำและเหตุผลเจาะลึกแบบละเอียด (Deep Rebalancing Rationale)
+                คำแนะนำและเหตุผลเจาะลึกแบบรายละเอียด (Columns O & P Integration)
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 วิเคราะห์สดจาก Google Sheet ทุกสินทรัพย์ ไม่ละเว้น พร้อมแนวทางสับเปลี่ยนกองทุนภาษีถูกต้องตามกฎหมาย
@@ -96,14 +96,11 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
                 <span className="w-6 h-6 rounded-full bg-[#D1E7DD] dark:bg-[#0F5132]/50 text-[#0F5132] dark:text-emerald-300 text-xs flex items-center justify-center font-black">
                   1
                 </span>
-                รายการที่แนะนำให้ซื้อเพิ่ม (BUY Actions) - พร้อมเหตุผลประกอบเจาะลึก
+                รายการที่แนะนำให้ซื้อเพิ่ม (BUY Actions) - พร้อมยอดแนะนำ Column O & เหตุผล Column P
               </h3>
 
               <div className="space-y-3">
                 {buyItems.map((item) => {
-                  const targetVal = (item.targetWeight / 100) * summary.totalMarketValue;
-                  const addAmount = Math.max(0, targetVal - item.marketValue);
-
                   return (
                     <div
                       key={item.id}
@@ -119,10 +116,10 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
 
                         <div className="text-right">
                           <span className="text-xs font-black text-[#0F5132] dark:text-emerald-400 block uppercase">
-                            ยอดเงินซื้อเพิ่มที่แนะนำ
+                            ยอดเงินซื้อเพิ่มที่แนะนำ (Column O)
                           </span>
-                          <span className="text-xl font-black text-[#0F5132] dark:text-emerald-300">
-                            +{formatTHB(addAmount)}
+                          <span className="text-lg font-black text-[#0F5132] dark:text-emerald-300">
+                            {item.suggestedActionAmount || '+BUY'}
                           </span>
                         </div>
                       </div>
@@ -130,9 +127,9 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
                       <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 text-xs text-slate-700 dark:text-slate-300 border border-[#0F5132]/20 font-medium space-y-1">
                         <div className="font-extrabold text-[#0F5132] dark:text-emerald-300 flex items-center gap-1">
                           <Info className="w-3.5 h-3.5" />
-                          เหตุผลประกอบคำแนะนำและที่มาข้อมูล:
+                          เหตุผลประกอบคำแนะนำ (Column P):
                         </div>
-                        <p>{item.detailedRationale}</p>
+                        <p>{item.recommendationRationale}</p>
                       </div>
                     </div>
                   );
@@ -148,14 +145,11 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
                 <span className="w-6 h-6 rounded-full bg-[#F8D7DA] dark:bg-[#842029]/50 text-[#842029] dark:text-rose-300 text-xs flex items-center justify-center font-black">
                   2
                 </span>
-                รายการที่แนะนำให้ทยอยขายกระชับสัดส่วน (SELL / TRIM Actions)
+                รายการที่แนะนำให้ทยอยขายกระชับสัดส่วน (SELL Actions) - พร้อมยอดแนะนำ Column O & เหตุผล Column P
               </h3>
 
               <div className="space-y-3">
                 {sellItems.map((item) => {
-                  const targetVal = (item.targetWeight / 100) * summary.totalMarketValue;
-                  const sellAmount = Math.max(0, item.marketValue - targetVal);
-
                   return (
                     <div
                       key={item.id}
@@ -171,10 +165,10 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
 
                         <div className="text-right">
                           <span className="text-xs font-black text-[#842029] dark:text-rose-400 block uppercase">
-                            ยอดเงินขายออกที่แนะนำ
+                            ยอดเงินขายออกที่แนะนำ (Column O)
                           </span>
-                          <span className="text-xl font-black text-[#842029] dark:text-rose-300">
-                            -{formatTHB(sellAmount)}
+                          <span className="text-lg font-black text-[#842029] dark:text-rose-300">
+                            {item.suggestedActionAmount || '-SELL'}
                           </span>
                         </div>
                       </div>
@@ -182,9 +176,9 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
                       <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 text-xs text-slate-700 dark:text-slate-300 border border-[#842029]/20 font-medium space-y-1">
                         <div className="font-extrabold text-[#842029] dark:text-rose-300 flex items-center gap-1">
                           <Info className="w-3.5 h-3.5" />
-                          เหตุผลประกอบคำแนะนำและที่มาข้อมูล:
+                          เหตุผลประกอบคำแนะนำ (Column P):
                         </div>
-                        <p>{item.detailedRationale}</p>
+                        <p>{item.recommendationRationale}</p>
                       </div>
                     </div>
                   );
@@ -220,7 +214,7 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
                     </div>
 
                     <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
-                      {item.detailedRationale}
+                      {item.recommendationRationale}
                     </p>
                   </div>
                 ))}

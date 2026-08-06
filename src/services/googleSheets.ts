@@ -11,33 +11,38 @@ function parseNumber(val: any): number {
   return isNaN(num) ? 0 : num;
 }
 
-// Spark's Tactical Rebalancing Amounts & Units Mapping (Strictly matching Spark's morning run)
+// Spark's Tactical Rebalancing Amounts & Rationale Map (matching Morning Rehearsal Run)
 const SPARK_TACTICAL_MAP: {
-  [key: string]: { amount: number; unitsStr: string; rationale: string };
+  [key: string]: { amount: number; unitsStr: string; rationale: string; actionAmountStr: string };
 } = {
   VOO: {
     amount: 250000,
     unitsStr: '10.6 หน่วย',
-    rationale: 'สัดส่วนปัจจุบันอยู่ที่ 2.07% ต่ำกว่าเป้าหมาย (8.00%) อยู่ -5.93% โครงสร้างกำไรบริษัทจดทะเบียนสหรัฐฯ 500 ตัวหลักใน VOO แข็งแกร่ง',
+    actionAmountStr: '+250,000 บาท (+10.6 หน่วย)',
+    rationale: 'สัดส่วนในพอร์ตปัจจุบันอยู่ที่ 2.07% ต่ำกว่าเป้าหมาย (8.00%) อยู่ -5.93% โครงสร้างกำไรบริษัทจดทะเบียนสหรัฐฯ 500 ตัวหลักใน VOO แข็งแกร่ง',
   },
   QQQM: {
     amount: 200000,
     unitsStr: '21 หน่วย',
+    actionAmountStr: '+200,000 บาท (+21 หน่วย)',
     rationale: 'สัดส่วนปัจจุบันอยู่ที่ 1.92% ต่ำกว่าเป้าหมาย (8.00%) อยู่ -6.08% เพื่อเพิ่มน้ำหนักในหุ้นเทคโนโลยีระดับโลก',
   },
   BTC: {
     amount: 50000,
     unitsStr: '0.023 BTC',
+    actionAmountStr: '+50,000 บาท (+0.023 BTC)',
     rationale: 'สัดส่วนปัจจุบันอยู่ที่ 0.82% ต่ำกว่าเป้าหมาย (4.00%) อยู่ -3.18% เข้าสะสมเพิ่มในสินทรัพย์ทางเลือกช่วงย่อตัว',
   },
   NOBLE: {
     amount: 280000,
     unitsStr: '100,000 หุ้น',
+    actionAmountStr: '-100,000 หุ้น (-280,000 บาท)',
     rationale: 'สัดส่วนในพอร์ตอยู่ที่ 2.03% เกินเป้าหมาย (0.50%) ปรับลดเพื่อนำเงินสดไปเพิ่มน้ำหนักใน VOO/QQQM',
   },
   SGOV: {
     amount: 331700,
     unitsStr: '100 หน่วย',
+    actionAmountStr: '-100 หน่วย (-331,700 บาท)',
     rationale: 'สัดส่วนปัจจุบันอยู่ที่ 3.24% เกินเป้าหมาย (1.00%) ปรับลดสัดส่วนพักเงินเพื่อหมุนเข้า ETF หุ้นเติบโต',
   },
 };
@@ -65,7 +70,7 @@ export const SPARK_MARKET_RESEARCH: MarketResearchHighlight[] = [
 
 export const SPARK_NEW_ASSETS: NewAssetRecommendation[] = [
   {
-    assetName: 'BABA19 (Alibaba DR)',
+    assetName: 'DR BABA19 (Alibaba DR)',
     assetClass: 'Foreign DR',
     broker: 'InnovestX / Yuanta',
     recommendedAmountTHB: 50000,
@@ -98,7 +103,7 @@ export function parseGoogleSheetCSV(csvText: string): {
   const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: false });
   const rows = parsed.data || [];
 
-  let fxRate = 33.08;
+  let fxRate = 33.00; // Cell B2 reference rate
   const items: AssetItem[] = [];
 
   let totalCostSum = 0;
@@ -107,6 +112,7 @@ export function parseGoogleSheetCSV(csvText: string): {
   rows.forEach((row, index) => {
     if (!row || row.length === 0) return;
 
+    // Check Cell B2 / FX Rate Parameter
     const firstColStr = (row[0] || '').trim();
     if (firstColStr.includes('FX Rate')) {
       const val = parseNumber(row[1]);
@@ -122,31 +128,33 @@ export function parseGoogleSheetCSV(csvText: string): {
       return;
     }
 
-    const assetClass = firstColStr;
-    const assetName = (row[1] || '').trim();
-    const broker = (row[2] || '').trim();
+    // Schema Columns A to P
+    const assetClass = firstColStr; // Column A
+    const assetName = (row[1] || '').trim(); // Column B
+    const broker = (row[2] || '').trim(); // Column C
 
     if (!assetName || !assetClass) return;
 
-    const units = parseNumber(row[3]);
-    const costPrice = parseNumber(row[4]);
-    const totalCost = parseNumber(row[5]);
-    const currentPrice = parseNumber(row[6]);
-    const marketValue = parseNumber(row[7]);
-    const pnlPercent = parseNumber(row[8]);
-    const currentWeight = parseNumber(row[9]);
-    const targetWeight = parseNumber(row[10]);
-    const weightVariance = parseNumber(row[11]);
+    const units = parseNumber(row[3]); // Column D
+    const costPrice = parseNumber(row[4]); // Column E
+    const totalCost = parseNumber(row[5]); // Column F
+    const currentPrice = parseNumber(row[6]); // Column G
+    const marketValue = parseNumber(row[7]); // Column H
+    const pnlPercent = parseNumber(row[8]); // Column I
+    const currentWeight = parseNumber(row[9]); // Column J
+    const targetWeight = parseNumber(row[10]); // Column K
+    const weightVariance = parseNumber(row[11]); // Column L
     
-    const rawAction = (row[12] || '').trim();
-    const userConstraint = (row[13] || '').trim();
-    const customSparkRationale = row[14] ? row[14].trim() : '';
+    const rawAction = (row[12] || '').trim(); // Column M
+    const userConstraint = (row[13] || '').trim(); // Column N
+    const rawSuggestedAmount = row[14] ? row[14].trim() : ''; // Column O
+    const rawRationale = row[15] ? row[15].trim() : ''; // Column P
 
-    let rebalanceAction: 'Buy' | 'Sell' | 'Hold' | 'Switch' | string = 'Hold';
+    let rebalanceAction: 'BUY' | 'SELL' | 'HOLD' | 'SWITCH' | string = 'HOLD';
     const lowerAction = rawAction.toLowerCase();
-    if (lowerAction.includes('buy')) rebalanceAction = 'Buy';
-    else if (lowerAction.includes('sell')) rebalanceAction = 'Sell';
-    else if (rawAction) rebalanceAction = rawAction;
+    if (lowerAction.includes('buy')) rebalanceAction = 'BUY';
+    else if (lowerAction.includes('sell')) rebalanceAction = 'SELL';
+    else if (rawAction) rebalanceAction = rawAction.toUpperCase();
 
     const isTaxLocked =
       userConstraint.includes('Tax Lock') ||
@@ -164,14 +172,20 @@ export function parseGoogleSheetCSV(csvText: string): {
     const recommendedAmountTHB = sparkOverride ? sparkOverride.amount : undefined;
     const recommendedUnitsStr = sparkOverride ? sparkOverride.unitsStr : undefined;
 
-    let detailedRationale = customSparkRationale;
-    if (!detailedRationale) {
+    // Column O: Suggested Action Amount
+    const suggestedActionAmount =
+      rawSuggestedAmount ||
+      (sparkOverride ? sparkOverride.actionAmountStr : rebalanceAction === 'BUY' ? `+${(recommendedAmountTHB || 0).toLocaleString('th-TH')} บาท` : rebalanceAction === 'SELL' ? `-${(recommendedAmountTHB || 0).toLocaleString('th-TH')} บาท` : '-');
+
+    // Column P: Recommendation Rationale
+    let recommendationRationale = rawRationale;
+    if (!recommendationRationale) {
       if (sparkOverride) {
-        detailedRationale = `คำแนะนำจาก Spark (${rebalanceAction.toUpperCase()}): ${sparkOverride.rationale} (ยอดแนะนำ ${rebalanceAction === 'Buy' ? 'ซื้อเพิ่ม' : 'ขายกระชับ'} ฿${sparkOverride.amount.toLocaleString('th-TH')} หรือประมาณ ${sparkOverride.unitsStr})`;
+        recommendationRationale = sparkOverride.rationale;
       } else if (isTaxLocked) {
-        detailedRationale = `คำแนะนำจาก Spark (HOLD - TAX PROTECTED): ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายคืนเป็นเงินสดตามกฎหมาย ให้ถือครองต่อจนครบกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่ม RMF/SSF/ThaiESG เดียวกันได้ตลอดเวลา`;
+        recommendationRationale = `ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายเป็นเงินสด ให้ถือครองต่อตามกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่มประเภทเดียวกัน`;
       } else {
-        detailedRationale = `คำแนะนำจาก Spark (HOLD): สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) สอดคล้องกับเป้าหมาย (${targetWeight.toFixed(2)}%) ผลตอบแทน ${pnlPercent.toFixed(2)}% อยู่ในกรอบ Rebalancing Band ไม่จำเป็นต้องทำรายการในรอบนี้`;
+        recommendationRationale = `สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) สอดคล้องกับเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ในกรอบ Rebalancing Band`;
       }
     }
 
@@ -194,7 +208,8 @@ export function parseGoogleSheetCSV(csvText: string): {
       weightVariance,
       rebalanceAction,
       userConstraint: userConstraint || undefined,
-      detailedRationale,
+      suggestedActionAmount,
+      recommendationRationale,
       switchTarget,
       recommendedAmountTHB,
       recommendedUnitsStr,
