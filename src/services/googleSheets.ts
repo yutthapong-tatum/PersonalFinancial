@@ -35,7 +35,7 @@ export function parseGoogleSheetCSV(csvText: string): {
   const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: false });
   const rows = parsed.data || [];
 
-  let fxRate = 33.0; // default reference rate
+  let fxRate = 33.0;
   const items: AssetItem[] = [];
 
   let totalCostSum = 0;
@@ -74,8 +74,11 @@ export function parseGoogleSheetCSV(csvText: string): {
     const currentWeight = parseNumber(row[9]);
     const targetWeight = parseNumber(row[10]);
     const weightVariance = parseNumber(row[11]);
+    
+    // Spark's exact analysis outputs from Google Sheet
     const rawAction = (row[12] || '').trim();
     const userConstraint = (row[13] || '').trim();
+    const customSparkRationale = row[14] ? row[14].trim() : '';
 
     let rebalanceAction: 'Buy' | 'Sell' | 'Hold' | 'Switch' | string = 'Hold';
     const lowerAction = rawAction.toLowerCase();
@@ -83,7 +86,6 @@ export function parseGoogleSheetCSV(csvText: string): {
     else if (lowerAction.includes('sell')) rebalanceAction = 'Sell';
     else if (rawAction) rebalanceAction = rawAction;
 
-    // Check for tax locked switching opportunity
     const isTaxLocked =
       userConstraint.includes('Tax Lock') ||
       userConstraint.includes('ห้ามขาย') ||
@@ -96,24 +98,26 @@ export function parseGoogleSheetCSV(csvText: string): {
       else if (assetName.includes('ThaiESG')) switchTarget = 'K-ESGSI-ThaiESG / SCBTP(ThaiESGA)';
     }
 
-    // Build explicit rationale for every asset
-    let detailedRationale = '';
-    const formatMoney = (n: number) => n.toLocaleString('th-TH', { maximumFractionDigits: 0 });
+    // Direct mapping of Spark's rationale or exact computed rationale matching Spark's analysis
+    let detailedRationale = customSparkRationale;
+    if (!detailedRationale) {
+      const formatMoney = (n: number) => n.toLocaleString('th-TH', { maximumFractionDigits: 0 });
 
-    if (rebalanceAction === 'Buy') {
-      const buyAmt = targetWeight > 0 ? ((targetWeight - currentWeight) / 100) * totalMarketValueSum : 0;
-      detailedRationale = `คำแนะนำ BUY: น้ำหนักปัจจุบัน (${currentWeight.toFixed(2)}%) ต่ำกว่าเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ ${Math.abs(weightVariance).toFixed(2)}% คิดเป็นยอดซื้อเพิ่มประมาณ ฿${formatMoney(Math.max(0, buyAmt))} เพื่อปรับสัดส่วนให้สอดคล้องกับพอร์ตเป้าหมาย`;
-    } else if (rebalanceAction === 'Sell') {
-      const sellAmt = targetWeight > 0 ? ((currentWeight - targetWeight) / 100) * totalMarketValueSum : totalCost;
-      detailedRationale = `คำแนะนำ SELL/TRIM: น้ำหนักปัจจุบัน (${currentWeight.toFixed(2)}%) สูงกว่าเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ +${weightVariance.toFixed(2)}% คิดเป็นยอดกระชับสัดส่วนประมาณ ฿${formatMoney(Math.max(0, sellAmt))} เพื่อดึงเงินหมุนไปลงทุนในสินทรัพย์ที่มีน้ำหนักขาด`;
-    } else if (isTaxLocked) {
-      if (switchTarget) {
-        detailedRationale = `คำแนะนำ TAX FUND SWITCHING: ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายคืนเป็นเงินสด แต่เนื่องจากผลตอบแทนติดลบสูง (${pnlPercent.toFixed(2)}%) แนะนำให้ทำการสับเปลี่ยนกองทุน (Fund Switch) ไปยัง ${switchTarget} ภายในสถาบันเพื่อโอกาสฟื้นตัว โดยไม่ผิดกฎหมายสรรพากร`;
+      if (rebalanceAction === 'Buy') {
+        const buyAmt = targetWeight > 0 ? ((targetWeight - currentWeight) / 100) * totalMarketValueSum : 0;
+        detailedRationale = `คำแนะนำจาก Spark (BUY): น้ำหนักปัจจุบัน (${currentWeight.toFixed(2)}%) ต่ำกว่าเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ ${Math.abs(weightVariance).toFixed(2)}% แนะนำสะสมเพิ่ม ฿${formatMoney(Math.max(0, buyAmt))} เพื่อปรับสมดุลพอร์ตตามเป้าหมาย`;
+      } else if (rebalanceAction === 'Sell') {
+        const sellAmt = targetWeight > 0 ? ((currentWeight - targetWeight) / 100) * totalMarketValueSum : totalCost;
+        detailedRationale = `คำแนะนำจาก Spark (SELL/TRIM): น้ำหนักปัจจุบัน (${currentWeight.toFixed(2)}%) เกินกว่าเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ +${weightVariance.toFixed(2)}% แนะนำกระชับสัดส่วนออก ฿${formatMoney(Math.max(0, sellAmt))} แล้วหมุนเงินไปลงทุนในสินทรัพย์ส่วนที่ยังขาด`;
+      } else if (isTaxLocked) {
+        if (switchTarget) {
+          detailedRationale = `คำแนะนำจาก Spark (TAX FUND SWITCHING): กองทุนติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายเป็นเงินสด แต่เนื่องจากผลตอบแทนชะลอตัว (${pnlPercent.toFixed(2)}%) Spark แนะนำสับเปลี่ยนกองทุน (Fund Switch) ไปยัง ${switchTarget} ภายในกลุ่มภาษีเดียวกันได้อย่างถูกต้องตามกฎหมายสรรพากร`;
+        } else {
+          detailedRationale = `คำแนะนำจาก Spark (HOLD - TAX PROTECTED): กองทุนติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายคืนเป็นเงินสดตามกฎหมาย ให้ถือครองต่อจนครบกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่ม RMF/SSF/ThaiESG เดียวกันได้ตลอดเวลา`;
+        }
       } else {
-        detailedRationale = `คำแนะนำ HOLD (TAX PROTECTED): ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายคืนเป็นเงินสดตามกฎหมายสรรพากร ให้ถือครองต่อจนครบกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่ม RMF/SSF/ThaiESG เดียวกันได้ตลอดเวลา`;
+        detailedRationale = `คำแนะนำจาก Spark (HOLD): สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) สอดคล้องกับเป้าหมาย (${targetWeight.toFixed(2)}%) ผลตอบแทน ${pnlPercent.toFixed(2)}% อยู่ในกรอบ Rebalancing Band ไม่จำเป็นต้องทำรายการในรอบนี้`;
       }
-    } else {
-      detailedRationale = `คำแนะนำ HOLD: สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) ใกล้เคียงกับเป้าหมาย (${targetWeight.toFixed(2)}%) ผลตอบแทนปัจจุบัน ${pnlPercent.toFixed(2)}% อยู่ในกรอบความเสี่ยงที่เหมาะสม ไม่จำเป็นต้องปรับสัดส่วนในรอบนี้`;
     }
 
     totalCostSum += totalCost;
