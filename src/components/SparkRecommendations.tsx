@@ -93,7 +93,7 @@ export const SparkRecommendations: React.FC<SparkRecommendationsProps> = ({
 
       {/* Key Action Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Top BUY Priority */}
+        {/* Card 1: All BUY Priority Items */}
         <div className="bg-slate-900/80 rounded-xl p-4 border border-emerald-500/40 hover:border-emerald-400 transition-all flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -107,21 +107,22 @@ export const SparkRecommendations: React.FC<SparkRecommendationsProps> = ({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed mb-3">
-               Spark แนะนำสะสมใน <strong className="text-white">VOO, QQQM</strong> และ <strong className="text-white">BTC</strong>
+              Spark แนะนำสะสมในสินทรัพย์กลุ่มที่มีสัดส่วนต่ำกว่าเป้าหมาย
             </p>
 
-            <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
-              {buyItems.slice(0, 3).map((item) => {
-                const amount = item.recommendedAmountTHB || 0;
+            <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 max-h-[180px] overflow-y-auto custom-scrollbar">
+              {buyItems.map((item) => {
+                const targetVal = (item.targetWeight / 100) * summary.totalMarketValue;
+                const amount = item.recommendedAmountTHB ?? Math.max(0, targetVal - item.marketValue);
                 return (
-                  <div key={item.id} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1">
-                      <span className="font-bold text-slate-200">{item.assetName}</span>
+                  <div key={item.id} className="flex items-center justify-between text-xs py-0.5 border-b border-slate-900/60 last:border-0">
+                    <div className="flex items-center gap-1 truncate max-w-[170px]">
+                      <span className="font-bold text-slate-200 truncate">{item.assetName}</span>
                       {item.recommendedUnitsStr && (
-                        <span className="text-[10px] text-slate-400 font-normal">({item.recommendedUnitsStr})</span>
+                        <span className="text-[10px] text-slate-400 font-normal flex-shrink-0">({item.recommendedUnitsStr})</span>
                       )}
                     </div>
-                    <span className="font-black text-emerald-400">
+                    <span className="font-black text-emerald-400 flex-shrink-0">
                       +{formatTHB(amount)}
                     </span>
                   </div>
@@ -131,11 +132,11 @@ export const SparkRecommendations: React.FC<SparkRecommendationsProps> = ({
           </div>
 
           <div className="mt-3 text-[11px] text-emerald-300/90 font-semibold flex items-center gap-1">
-            <span>💡 ตรงตามงวดสะสมแนะนำของ Spark</span>
+            <span>💡 แสดงครบทั้ง {buyItems.length} รายการตรงตาม Badge</span>
           </div>
         </div>
 
-        {/* Card 2: Top SELL Priority */}
+        {/* Card 2: All SELL Priority Items */}
         <div className="bg-slate-900/80 rounded-xl p-4 border border-rose-500/40 hover:border-rose-400 transition-all flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -149,21 +150,22 @@ export const SparkRecommendations: React.FC<SparkRecommendationsProps> = ({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed mb-3">
-              Spark แนะนำปรับลด <strong className="text-white">NOBLE</strong> (100,000 หุ้น) และ <strong className="text-white">SGOV</strong> (100 หน่วย)
+              Spark แนะนำปรับลดสินทรัพย์ที่มีสัดส่วนล้นพอร์ตเกินเป้าหมาย
             </p>
 
-            <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+            <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 max-h-[180px] overflow-y-auto custom-scrollbar">
               {sellItems.map((item) => {
-                const amount = item.recommendedAmountTHB || 0;
+                const targetVal = (item.targetWeight / 100) * summary.totalMarketValue;
+                const amount = item.recommendedAmountTHB ?? Math.max(0, item.marketValue - targetVal);
                 return (
-                  <div key={item.id} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1">
-                      <span className="font-bold text-slate-200">{item.assetName}</span>
+                  <div key={item.id} className="flex items-center justify-between text-xs py-0.5 border-b border-slate-900/60 last:border-0">
+                    <div className="flex items-center gap-1 truncate max-w-[170px]">
+                      <span className="font-bold text-slate-200 truncate">{item.assetName}</span>
                       {item.recommendedUnitsStr && (
-                        <span className="text-[10px] text-slate-400 font-normal">({item.recommendedUnitsStr})</span>
+                        <span className="text-[10px] text-slate-400 font-normal flex-shrink-0">({item.recommendedUnitsStr})</span>
                       )}
                     </div>
-                    <span className="font-black text-rose-400">
+                    <span className="font-black text-rose-400 flex-shrink-0">
                       -{formatTHB(amount)}
                     </span>
                   </div>
@@ -173,7 +175,7 @@ export const SparkRecommendations: React.FC<SparkRecommendationsProps> = ({
           </div>
 
           <div className="mt-3 text-[11px] text-rose-300/90 font-semibold flex items-center gap-1">
-            <span>💡 หมุนเงินทุนเข้า VOO/QQQM/BTC</span>
+            <span>💡 แสดงครบทั้ง {sellItems.length} รายการตรงตาม Badge</span>
           </div>
         </div>
 
