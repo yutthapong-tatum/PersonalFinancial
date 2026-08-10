@@ -479,6 +479,21 @@ export const AssetTable: React.FC<AssetTableProps> = ({ items, onOpenRebalanceMo
                               {item.recommendationRationale}
                             </p>
 
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              {item.lastReviewedTimestamp && (
+                                <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-semibold border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                                  <span>🕒 Column Q:</span>
+                                  <span>{item.lastReviewedTimestamp}</span>
+                                </span>
+                              )}
+                              {item.updatedBy && (
+                                <span className="px-2.5 py-1 rounded-md bg-indigo-100 text-indigo-900 dark:bg-indigo-900/50 dark:text-indigo-300 text-[11px] font-black border border-indigo-200 dark:border-indigo-700 flex items-center gap-1">
+                                  <span>🤖 Column R (Updated By):</span>
+                                  <span>{item.updatedBy}</span>
+                                </span>
+                              )}
+                            </div>
+
                             {item.switchTarget && (
                               <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-300 font-bold flex items-center gap-2">
                                 <Repeat className="w-4 h-4 text-amber-600" />

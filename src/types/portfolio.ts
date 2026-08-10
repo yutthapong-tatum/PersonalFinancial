@@ -34,6 +34,10 @@ export interface AssetItem {
   suggestedActionAmount?: string;
   // Column P: Recommendation Rationale
   recommendationRationale?: string;
+  // Column Q: Last Reviewed Timestamp
+  lastReviewedTimestamp?: string;
+  // Column R: Updated By System / Agent
+  updatedBy?: string;
 
   // Extra helper fields
   switchTarget?: string;

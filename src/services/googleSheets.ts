@@ -11,41 +11,23 @@ function parseNumber(val: any): number {
   return isNaN(num) ? 0 : num;
 }
 
-// Spark's Tactical Rebalancing Amounts & Rationale Map (matching Morning Rehearsal Run)
-const SPARK_TACTICAL_MAP: {
-  [key: string]: { amount: number; unitsStr: string; rationale: string; actionAmountStr: string };
-} = {
-  VOO: {
-    amount: 250000,
-    unitsStr: '10.6 หน่วย',
-    actionAmountStr: '+250,000 บาท (+10.6 หน่วย)',
-    rationale: 'สัดส่วนในพอร์ตปัจจุบันอยู่ที่ 2.07% ต่ำกว่าเป้าหมาย (8.00%) อยู่ -5.93% โครงสร้างกำไรบริษัทจดทะเบียนสหรัฐฯ 500 ตัวหลักใน VOO แข็งแกร่ง',
-  },
-  QQQM: {
-    amount: 200000,
-    unitsStr: '21 หน่วย',
-    actionAmountStr: '+200,000 บาท (+21 หน่วย)',
-    rationale: 'สัดส่วนปัจจุบันอยู่ที่ 1.92% ต่ำกว่าเป้าหมาย (8.00%) อยู่ -6.08% เพื่อเพิ่มน้ำหนักในหุ้นเทคโนโลยีระดับโลก',
-  },
-  BTC: {
-    amount: 50000,
-    unitsStr: '0.023 BTC',
-    actionAmountStr: '+50,000 บาท (+0.023 BTC)',
-    rationale: 'สัดส่วนปัจจุบันอยู่ที่ 0.82% ต่ำกว่าเป้าหมาย (4.00%) อยู่ -3.18% เข้าสะสมเพิ่มในสินทรัพย์ทางเลือกช่วงย่อตัว',
-  },
-  NOBLE: {
-    amount: 280000,
-    unitsStr: '100,000 หุ้น',
-    actionAmountStr: '-100,000 หุ้น (-280,000 บาท)',
-    rationale: 'สัดส่วนในพอร์ตอยู่ที่ 2.03% เกินเป้าหมาย (0.50%) ปรับลดเพื่อนำเงินสดไปเพิ่มน้ำหนักใน VOO/QQQM',
-  },
-  SGOV: {
-    amount: 331700,
-    unitsStr: '100 หน่วย',
-    actionAmountStr: '-100 หน่วย (-331,700 บาท)',
-    rationale: 'สัดส่วนปัจจุบันอยู่ที่ 3.24% เกินเป้าหมาย (1.00%) ปรับลดสัดส่วนพักเงินเพื่อหมุนเข้า ETF หุ้นเติบโต',
-  },
-};
+function extractActionAmount(str: string): { amountTHB?: number; unitsStr?: string } {
+  if (!str || str === '-') return { amountTHB: undefined, unitsStr: undefined };
+
+  // Match THB amount like +200,000 บาท or -184,000 บาท or (-184,000 บาท)
+  const thbMatch = str.match(/([+-]?[\d,]+(?:\.\d+)?)\s*บาท/);
+  let amountTHB = undefined;
+  if (thbMatch) {
+    const rawNum = thbMatch[1].replace(/,/g, '').replace(/\+/g, '').replace(/-/g, '');
+    amountTHB = parseFloat(rawNum);
+  }
+
+  // Match units string like (+533 หุ้น), (+7.7 หน่วย), (-100,000 หุ้น), (-100 หน่วย), (+0.023 BTC)
+  const unitMatch = str.match(/([+-]?[\d,]+(?:\.\d+)?\s*(?:หุ้น|หน่วย|BTC|oz|หุ้นกู้))/i);
+  let unitsStr = unitMatch ? unitMatch[1].trim() : undefined;
+
+  return { amountTHB, unitsStr };
+}
 
 export const SPARK_MARKET_RESEARCH: MarketResearchHighlight[] = [
   {
@@ -103,7 +85,10 @@ export function parseGoogleSheetCSV(csvText: string): {
   const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: false });
   const rows = parsed.data || [];
 
-  let fxRate = 33.00; // Cell B2 reference rate
+  let fxRate = 33.15; // Cell B2 reference rate
+  let lastReviewTimestamp = '';
+  let sheetTotalCost = 0;
+  let sheetTotalMarketValue = 0;
   const items: AssetItem[] = [];
 
   let totalCostSum = 0;
@@ -112,18 +97,37 @@ export function parseGoogleSheetCSV(csvText: string): {
   rows.forEach((row, index) => {
     if (!row || row.length === 0) return;
 
-    // Check Cell B2 / FX Rate Parameter
     const firstColStr = (row[0] || '').trim();
+
+    // Check Cell B2 / FX Rate Parameter
     if (firstColStr.includes('FX Rate')) {
       const val = parseNumber(row[1]);
       if (val > 0) fxRate = val;
       return;
     }
 
+    // Check Cell B3 / Last Full Portfolio Review Timestamp
+    if (
+      firstColStr.includes('Last Full Portfolio Review Timestamp') ||
+      firstColStr.includes('วันที่เวลาทบทวน')
+    ) {
+      const ts = (row[1] || '').trim();
+      if (ts) lastReviewTimestamp = ts;
+      return;
+    }
+
+    // Check Total Portfolio / Summary Row (e.g. Row 106)
+    if (firstColStr.includes('Total Portfolio') || firstColStr.includes('ยอดรวม')) {
+      const costVal = parseNumber(row[5]);
+      const marketVal = parseNumber(row[7]);
+      if (costVal > 0) sheetTotalCost = costVal;
+      if (marketVal > 0) sheetTotalMarketValue = marketVal;
+      return;
+    }
+
     if (
       firstColStr.includes('Asset Class') ||
-      firstColStr.includes('Investment Portfolio Tracker') ||
-      firstColStr.includes('Total Portfolio')
+      firstColStr.includes('Investment Portfolio Tracker')
     ) {
       return;
     }
@@ -144,11 +148,13 @@ export function parseGoogleSheetCSV(csvText: string): {
     const currentWeight = parseNumber(row[9]); // Column J
     const targetWeight = parseNumber(row[10]); // Column K
     const weightVariance = parseNumber(row[11]); // Column L
-    
+
     const rawAction = (row[12] || '').trim(); // Column M
     const userConstraint = (row[13] || '').trim(); // Column N
     const rawSuggestedAmount = row[14] ? row[14].trim() : ''; // Column O
     const rawRationale = row[15] ? row[15].trim() : ''; // Column P
+    const lastReviewedTimestamp = row[16] ? row[16].trim() : undefined; // Column Q
+    const updatedBy = row[17] ? row[17].trim() : undefined; // Column R
 
     let rebalanceAction: 'BUY' | 'SELL' | 'HOLD' | 'SWITCH' | string = 'HOLD';
     const lowerAction = rawAction.toLowerCase();
@@ -168,21 +174,20 @@ export function parseGoogleSheetCSV(csvText: string): {
       else if (assetName.includes('ThaiESG')) switchTarget = 'K-ESGSI-ThaiESG / SCBTP(ThaiESGA)';
     }
 
-    const sparkOverride = SPARK_TACTICAL_MAP[assetName];
-    const recommendedAmountTHB = sparkOverride ? sparkOverride.amount : undefined;
-    const recommendedUnitsStr = sparkOverride ? sparkOverride.unitsStr : undefined;
+    // Parse numeric amount THB & units string directly from Column O
+    const { amountTHB: extractedAmountTHB, unitsStr: extractedUnitsStr } =
+      extractActionAmount(rawSuggestedAmount);
+
+    const recommendedAmountTHB = extractedAmountTHB;
+    const recommendedUnitsStr = extractedUnitsStr;
 
     // Column O: Suggested Action Amount
-    const suggestedActionAmount =
-      rawSuggestedAmount ||
-      (sparkOverride ? sparkOverride.actionAmountStr : rebalanceAction === 'BUY' ? `+${(recommendedAmountTHB || 0).toLocaleString('th-TH')} บาท` : rebalanceAction === 'SELL' ? `-${(recommendedAmountTHB || 0).toLocaleString('th-TH')} บาท` : '-');
+    const suggestedActionAmount = rawSuggestedAmount || '-';
 
     // Column P: Recommendation Rationale
     let recommendationRationale = rawRationale;
     if (!recommendationRationale) {
-      if (sparkOverride) {
-        recommendationRationale = sparkOverride.rationale;
-      } else if (isTaxLocked) {
+      if (isTaxLocked) {
         recommendationRationale = `ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายเป็นเงินสด ให้ถือครองต่อตามกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่มประเภทเดียวกัน`;
       } else {
         recommendationRationale = `สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) สอดคล้องกับเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ในกรอบ Rebalancing Band`;
@@ -210,31 +215,38 @@ export function parseGoogleSheetCSV(csvText: string): {
       userConstraint: userConstraint || undefined,
       suggestedActionAmount,
       recommendationRationale,
+      lastReviewedTimestamp,
+      updatedBy,
       switchTarget,
       recommendedAmountTHB,
       recommendedUnitsStr,
     });
   });
 
-  const netPnLAmount = totalMarketValueSum - totalCostSum;
-  const netPnLPercent = totalCostSum > 0 ? (netPnLAmount / totalCostSum) * 100 : 0;
+  const finalTotalCost = sheetTotalCost > 0 ? sheetTotalCost : totalCostSum;
+  const finalTotalMarketValue = sheetTotalMarketValue > 0 ? sheetTotalMarketValue : totalMarketValueSum;
+  const netPnLAmount = finalTotalMarketValue - finalTotalCost;
+  const netPnLPercent = finalTotalCost > 0 ? (netPnLAmount / finalTotalCost) * 100 : 0;
 
   const summary: PortfolioSummary = {
-    totalCost: totalCostSum,
-    totalMarketValue: totalMarketValueSum,
+    totalCost: finalTotalCost,
+    totalMarketValue: finalTotalMarketValue,
     netPnLAmount,
     netPnLPercent,
     fxRateUSDTHB: fxRate,
-    lastUpdated: new Date().toLocaleString('th-TH', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }),
+    lastUpdated:
+      lastReviewTimestamp ||
+      new Date().toLocaleString('th-TH', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
     assetCount: items.length,
   };
 
   return { items, summary };
 }
+

@@ -125,9 +125,16 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
                       </div>
 
                       <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 text-xs text-slate-700 dark:text-slate-300 border border-[#0F5132]/20 font-medium space-y-1">
-                        <div className="font-extrabold text-[#0F5132] dark:text-emerald-300 flex items-center gap-1">
-                          <Info className="w-3.5 h-3.5" />
-                          เหตุผลประกอบคำแนะนำ (Column P):
+                        <div className="font-extrabold text-[#0F5132] dark:text-emerald-300 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Info className="w-3.5 h-3.5" />
+                            เหตุผลประกอบคำแนะนำ (Column P):
+                          </span>
+                          {item.updatedBy && (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-300 font-extrabold">
+                              Source (Col R): {item.updatedBy}
+                            </span>
+                          )}
                         </div>
                         <p>{item.recommendationRationale}</p>
                       </div>
@@ -174,9 +181,16 @@ export const RebalanceModal: React.FC<RebalanceModalProps> = ({
                       </div>
 
                       <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 text-xs text-slate-700 dark:text-slate-300 border border-[#842029]/20 font-medium space-y-1">
-                        <div className="font-extrabold text-[#842029] dark:text-rose-300 flex items-center gap-1">
-                          <Info className="w-3.5 h-3.5" />
-                          เหตุผลประกอบคำแนะนำ (Column P):
+                        <div className="font-extrabold text-[#842029] dark:text-rose-300 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Info className="w-3.5 h-3.5" />
+                            เหตุผลประกอบคำแนะนำ (Column P):
+                          </span>
+                          {item.updatedBy && (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-300 font-extrabold">
+                              Source (Col R): {item.updatedBy}
+                            </span>
+                          )}
                         </div>
                         <p>{item.recommendationRationale}</p>
                       </div>
