@@ -2,11 +2,17 @@ import Papa from 'papaparse';
 import { AssetItem, PortfolioSummary, MarketResearchHighlight, NewAssetRecommendation } from '../types/portfolio';
 
 const SPREADSHEET_ID = '1QEhVslOnEBrgdxZLa9v5tyTdBhlaPE-6ABN5sME5ZNA';
-const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
+const GVIZ_BASE_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
 
 function parseNumber(val: any): number {
   if (val === undefined || val === null) return 0;
-  const str = String(val).replace(/,/g, '').replace(/%/g, '').trim();
+  const str = String(val)
+    .replace(/฿|\$|บาท|THB/gi, '')
+    .replace(/,/g, '')
+    .replace(/%/g, '')
+    .replace(/#N\/A|#VALUE!|#REF!|#NAME\?|N\/A/gi, '')
+    .trim();
+  if (!str || str === '-') return 0;
   const num = parseFloat(str);
   return isNaN(num) ? 0 : num;
 }
@@ -66,11 +72,19 @@ export async function fetchPortfolioData(): Promise<{
   summary: PortfolioSummary;
 }> {
   try {
-    const res = await fetch(GVIZ_URL, { cache: 'no-store' });
+    // Append timestamp cache-buster to prevent Google CDN stale responses
+    const url = `${GVIZ_BASE_URL}&t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) {
       throw new Error(`Failed to fetch Google Sheet data: ${res.statusText}`);
     }
     const csvText = await res.text();
+
+    // Check if response is HTML (e.g. Google login redirect or permission error)
+    if (csvText.trim().startsWith('<!DOCTYPE html>') || csvText.trim().startsWith('<html')) {
+      throw new Error('Google Sheet returned HTML instead of CSV data. Please verify spreadsheet access permissions.');
+    }
+
     return parseGoogleSheetCSV(csvText);
   } catch (error) {
     console.error('Error fetching Google Sheet:', error);
@@ -82,10 +96,10 @@ export function parseGoogleSheetCSV(csvText: string): {
   items: AssetItem[];
   summary: PortfolioSummary;
 } {
-  const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: false });
+  const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: true });
   const rows = parsed.data || [];
 
-  let fxRate = 33.15; // Cell B2 reference rate
+  let fxRate = 33.15; // Reference rate
   let lastReviewTimestamp = '';
   let sheetTotalCost = 0;
   let sheetTotalMarketValue = 0;
@@ -94,135 +108,190 @@ export function parseGoogleSheetCSV(csvText: string): {
   let totalCostSum = 0;
   let totalMarketValueSum = 0;
 
+  // Default Column Index Map
+  let colMap = {
+    assetClass: 0,
+    assetName: 1,
+    broker: 2,
+    units: 3,
+    costPrice: 4,
+    totalCost: 5,
+    currentPrice: 6,
+    marketValue: 7,
+    pnlPercent: 8,
+    currentWeight: 9,
+    targetWeight: 10,
+    weightVariance: 11,
+    rebalanceAction: 12,
+    userConstraint: 13,
+    suggestedActionAmount: 14,
+    recommendationRationale: 15,
+    lastReviewedTimestamp: 16,
+    updatedBy: 17,
+  };
+
+  let hasDetectedHeaders = false;
+
   rows.forEach((row, index) => {
     if (!row || row.length === 0) return;
 
-    const firstColStr = (row[0] || '').trim();
+    try {
+      const fullRowText = row.join(' ').toLowerCase();
 
-    // Check Cell B2 / FX Rate Parameter
-    if (firstColStr.includes('FX Rate')) {
-      const val = parseNumber(row[1]);
-      if (val > 0) fxRate = val;
-      return;
-    }
-
-    // Check Cell B3 / Last Full Portfolio Review Timestamp
-    if (
-      firstColStr.includes('Last Full Portfolio Review Timestamp') ||
-      firstColStr.includes('วันที่เวลาทบทวน')
-    ) {
-      const ts = (row[1] || '').trim();
-      if (ts) lastReviewTimestamp = ts;
-      return;
-    }
-
-    // Check Total Portfolio / Summary Row (e.g. Row 106)
-    if (firstColStr.includes('Total Portfolio') || firstColStr.includes('ยอดรวม')) {
-      const costVal = parseNumber(row[5]);
-      const marketVal = parseNumber(row[7]);
-      if (costVal > 0) sheetTotalCost = costVal;
-      if (marketVal > 0) sheetTotalMarketValue = marketVal;
-      return;
-    }
-
-    if (
-      firstColStr.includes('Asset Class') ||
-      firstColStr.includes('Investment Portfolio Tracker')
-    ) {
-      return;
-    }
-
-    // Schema Columns A to P
-    const assetClass = firstColStr; // Column A
-    const assetName = (row[1] || '').trim(); // Column B
-    const broker = (row[2] || '').trim(); // Column C
-
-    if (!assetName || !assetClass) return;
-
-    const units = parseNumber(row[3]); // Column D
-    const costPrice = parseNumber(row[4]); // Column E
-    const totalCost = parseNumber(row[5]); // Column F
-    const currentPrice = parseNumber(row[6]); // Column G
-    const marketValue = parseNumber(row[7]); // Column H
-    const pnlPercent = parseNumber(row[8]); // Column I
-    const currentWeight = parseNumber(row[9]); // Column J
-    const targetWeight = parseNumber(row[10]); // Column K
-    const weightVariance = parseNumber(row[11]); // Column L
-
-    const rawAction = (row[12] || '').trim(); // Column M
-    const userConstraint = (row[13] || '').trim(); // Column N
-    const rawSuggestedAmount = row[14] ? row[14].trim() : ''; // Column O
-    const rawRationale = row[15] ? row[15].trim() : ''; // Column P
-    const lastReviewedTimestamp = row[16] ? row[16].trim() : undefined; // Column Q
-    const updatedBy = row[17] ? row[17].trim() : undefined; // Column R
-
-    let rebalanceAction: 'BUY' | 'SELL' | 'HOLD' | 'SWITCH' | string = 'HOLD';
-    const lowerAction = rawAction.toLowerCase();
-    if (lowerAction.includes('buy')) rebalanceAction = 'BUY';
-    else if (lowerAction.includes('sell')) rebalanceAction = 'SELL';
-    else if (rawAction) rebalanceAction = rawAction.toUpperCase();
-
-    const isTaxLocked =
-      userConstraint.includes('Tax Lock') ||
-      userConstraint.includes('ห้ามขาย') ||
-      assetClass.includes('Tax-Saving');
-
-    let switchTarget: string | undefined = undefined;
-    if (isTaxLocked && (pnlPercent < -20 || (marketValue === 0 && totalCost > 0))) {
-      if (assetName.includes('RMF')) switchTarget = 'SCBRMS&P500 / SCBRMNDQ(A)';
-      else if (assetName.includes('SSF')) switchTarget = 'SCBS&P500-SSF / SCBSE-SSF';
-      else if (assetName.includes('ThaiESG')) switchTarget = 'K-ESGSI-ThaiESG / SCBTP(ThaiESGA)';
-    }
-
-    // Parse numeric amount THB & units string directly from Column O
-    const { amountTHB: extractedAmountTHB, unitsStr: extractedUnitsStr } =
-      extractActionAmount(rawSuggestedAmount);
-
-    const recommendedAmountTHB = extractedAmountTHB;
-    const recommendedUnitsStr = extractedUnitsStr;
-
-    // Column O: Suggested Action Amount
-    const suggestedActionAmount = rawSuggestedAmount || '-';
-
-    // Column P: Recommendation Rationale
-    let recommendationRationale = rawRationale;
-    if (!recommendationRationale) {
-      if (isTaxLocked) {
-        recommendationRationale = `ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายเป็นเงินสด ให้ถือครองต่อตามกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่มประเภทเดียวกัน`;
-      } else {
-        recommendationRationale = `สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) สอดคล้องกับเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ในกรอบ Rebalancing Band`;
+      // 1. Detect Parameter Rows (FX Rate, Last Review Timestamp)
+      const firstColStr = (row[0] || '').trim();
+      if (firstColStr.includes('FX Rate')) {
+        const val = parseNumber(row[1] || row[2]);
+        if (val > 0) fxRate = val;
+        return;
       }
+
+      if (
+        firstColStr.includes('Last Full Portfolio Review Timestamp') ||
+        firstColStr.includes('วันที่เวลาทบทวน')
+      ) {
+        const ts = (row[1] || '').trim();
+        if (ts) lastReviewTimestamp = ts;
+        return;
+      }
+
+      // Check Total Portfolio / Summary Row
+      if (firstColStr.includes('Total Portfolio') || firstColStr.includes('ยอดรวม')) {
+        const costVal = parseNumber(row[colMap.totalCost] || row[5]);
+        const marketVal = parseNumber(row[colMap.marketValue] || row[7]);
+        if (costVal > 0) sheetTotalCost = costVal;
+        if (marketVal > 0) sheetTotalMarketValue = marketVal;
+        return;
+      }
+
+      // 2. Dynamic Header Row Detection
+      if (!hasDetectedHeaders && (fullRowText.includes('asset class') || fullRowText.includes('หมวดหมู่สินทรัพย์') || fullRowText.includes('asset name') || fullRowText.includes('ชื่อสินทรัพย์'))) {
+        row.forEach((cellText, idx) => {
+          const lower = (cellText || '').toLowerCase();
+          if (lower.includes('asset class') || lower.includes('หมวดหมู่')) colMap.assetClass = idx;
+          else if (lower.includes('asset name') || lower.includes('ticker') || lower.includes('ชื่อสินทรัพย์')) colMap.assetName = idx;
+          else if (lower.includes('account') || lower.includes('broker') || lower.includes('บล.') || lower.includes('บัญชี')) colMap.broker = idx;
+          else if (lower.includes('unit') || lower.includes('หน่วย')) colMap.units = idx;
+          else if (lower.includes('cost price') || lower.includes('ราคาต้นทุน')) colMap.costPrice = idx;
+          else if (lower.includes('total cost') || lower.includes('ต้นทุนรวม')) colMap.totalCost = idx;
+          else if (lower.includes('current price') || lower.includes('ราคาปัจจุบัน')) colMap.currentPrice = idx;
+          else if (lower.includes('market value') || lower.includes('มูลค่าตามราคาตลาด')) colMap.marketValue = idx;
+          else if (lower.includes('pnl') || lower.includes('กำไร/ขาดทุน')) colMap.pnlPercent = idx;
+          else if (lower.includes('current weight') || lower.includes('สัดส่วนปัจจุบัน')) colMap.currentWeight = idx;
+          else if (lower.includes('target weight') || lower.includes('สัดส่วนเป้าหมาย')) colMap.targetWeight = idx;
+          else if (lower.includes('weight variance') || lower.includes('ส่วนต่าง')) colMap.weightVariance = idx;
+          else if (lower.includes('rebalance action') || lower.includes('คำแนะนำ rebalance')) colMap.rebalanceAction = idx;
+          else if (lower.includes('user constraint') || lower.includes('เงื่อนไขข้อจำกัด')) colMap.userConstraint = idx;
+          else if (lower.includes('suggested action amount') || lower.includes('จำนวนเงิน')) colMap.suggestedActionAmount = idx;
+          else if (lower.includes('recommendation rationale') || lower.includes('เหตุผล')) colMap.recommendationRationale = idx;
+          else if (lower.includes('last reviewed') || lower.includes('วันที่เวลา review')) colMap.lastReviewedTimestamp = idx;
+          else if (lower.includes('updated by') || lower.includes('ผู้ปรับปรุง')) colMap.updatedBy = idx;
+        });
+        hasDetectedHeaders = true;
+        return; // Skip processing the header row itself
+      }
+
+      // Skip generic title or header lines if re-encountered
+      if (
+        firstColStr.includes('Asset Class') ||
+        firstColStr.includes('Investment Portfolio Tracker')
+      ) {
+        return;
+      }
+
+      // Extract values dynamically using colMap
+      const assetClass = (row[colMap.assetClass] || firstColStr).trim();
+      const assetName = (row[colMap.assetName] || '').trim();
+      const broker = (row[colMap.broker] || '').trim();
+
+      // Require valid assetName and assetClass to process as an asset item
+      if (!assetName || assetName === '-' || !assetClass) return;
+
+      const units = parseNumber(row[colMap.units]);
+      const costPrice = parseNumber(row[colMap.costPrice]);
+      const totalCost = parseNumber(row[colMap.totalCost]);
+      const currentPrice = parseNumber(row[colMap.currentPrice]);
+      const marketValue = parseNumber(row[colMap.marketValue]);
+      const pnlPercent = parseNumber(row[colMap.pnlPercent]);
+      const currentWeight = parseNumber(row[colMap.currentWeight]);
+      const targetWeight = parseNumber(row[colMap.targetWeight]);
+      const weightVariance = parseNumber(row[colMap.weightVariance]);
+
+      const rawAction = (row[colMap.rebalanceAction] || '').trim();
+      const userConstraint = (row[colMap.userConstraint] || '').trim();
+      const rawSuggestedAmount = row[colMap.suggestedActionAmount] ? row[colMap.suggestedActionAmount].trim() : '';
+      const rawRationale = row[colMap.recommendationRationale] ? row[colMap.recommendationRationale].trim() : '';
+      const lastReviewedTimestamp = row[colMap.lastReviewedTimestamp] ? row[colMap.lastReviewedTimestamp].trim() : undefined;
+      const updatedBy = row[colMap.updatedBy] ? row[colMap.updatedBy].trim() : undefined;
+
+      let rebalanceAction: 'BUY' | 'SELL' | 'HOLD' | 'SWITCH' | string = 'HOLD';
+      const lowerAction = rawAction.toLowerCase();
+      if (lowerAction.includes('buy')) rebalanceAction = 'BUY';
+      else if (lowerAction.includes('sell')) rebalanceAction = 'SELL';
+      else if (rawAction) rebalanceAction = rawAction.toUpperCase();
+
+      const isTaxLocked =
+        userConstraint.includes('Tax Lock') ||
+        userConstraint.includes('ห้ามขาย') ||
+        assetClass.includes('Tax-Saving');
+
+      let switchTarget: string | undefined = undefined;
+      if (isTaxLocked && (pnlPercent < -20 || (marketValue === 0 && totalCost > 0))) {
+        if (assetName.includes('RMF')) switchTarget = 'SCBRMS&P500 / SCBRMNDQ(A)';
+        else if (assetName.includes('SSF')) switchTarget = 'SCBS&P500-SSF / SCBSE-SSF';
+        else if (assetName.includes('ThaiESG')) switchTarget = 'K-ESGSI-ThaiESG / SCBTP(ThaiESGA)';
+      }
+
+      // Parse numeric amount THB & units string directly
+      const { amountTHB: extractedAmountTHB, unitsStr: extractedUnitsStr } =
+        extractActionAmount(rawSuggestedAmount);
+
+      const recommendedAmountTHB = extractedAmountTHB;
+      const recommendedUnitsStr = extractedUnitsStr;
+      const suggestedActionAmount = rawSuggestedAmount || '-';
+
+      let recommendationRationale = rawRationale;
+      if (!recommendationRationale) {
+        if (isTaxLocked) {
+          recommendationRationale = `ติดเงื่อนไขภาษี (${userConstraint}) ห้ามขายเป็นเงินสด ให้ถือครองต่อตามกำหนด หรือเลือกสับเปลี่ยนกองทุน (Fund Switch) ภายในกลุ่มประเภทเดียวกัน`;
+        } else {
+          recommendationRationale = `สัดส่วนปัจจุบัน (${currentWeight.toFixed(2)}%) สอดคล้องกับเป้าหมาย (${targetWeight.toFixed(2)}%) อยู่ในกรอบ Rebalancing Band`;
+        }
+      }
+
+      totalCostSum += totalCost;
+      totalMarketValueSum += marketValue;
+
+      items.push({
+        id: `${assetName}-${broker}-${index}`,
+        assetClass,
+        assetName,
+        broker,
+        units,
+        costPrice,
+        totalCost,
+        currentPrice,
+        marketValue,
+        pnlPercent,
+        currentWeight,
+        targetWeight,
+        weightVariance,
+        rebalanceAction,
+        userConstraint: userConstraint || undefined,
+        suggestedActionAmount,
+        recommendationRationale,
+        lastReviewedTimestamp,
+        updatedBy,
+        switchTarget,
+        recommendedAmountTHB,
+        recommendedUnitsStr,
+      });
+    } catch (rowError) {
+      console.warn(`Skipped unparseable row at index ${index}:`, rowError);
     }
-
-    totalCostSum += totalCost;
-    totalMarketValueSum += marketValue;
-
-    items.push({
-      id: `${assetName}-${broker}-${index}`,
-      assetClass,
-      assetName,
-      broker,
-      units,
-      costPrice,
-      totalCost,
-      currentPrice,
-      marketValue,
-      pnlPercent,
-      currentWeight,
-      targetWeight,
-      weightVariance,
-      rebalanceAction,
-      userConstraint: userConstraint || undefined,
-      suggestedActionAmount,
-      recommendationRationale,
-      lastReviewedTimestamp,
-      updatedBy,
-      switchTarget,
-      recommendedAmountTHB,
-      recommendedUnitsStr,
-    });
   });
 
+  // Prioritize the official Total Portfolio summary row from Google Sheet if present
   const finalTotalCost = sheetTotalCost > 0 ? sheetTotalCost : totalCostSum;
   const finalTotalMarketValue = sheetTotalMarketValue > 0 ? sheetTotalMarketValue : totalMarketValueSum;
   const netPnLAmount = finalTotalMarketValue - finalTotalCost;
@@ -249,4 +318,5 @@ export function parseGoogleSheetCSV(csvText: string): {
 
   return { items, summary };
 }
+
 

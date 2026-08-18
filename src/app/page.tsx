@@ -35,6 +35,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData();
+    // Auto-sync from Google Sheets every 30 seconds
+    const interval = setInterval(() => {
+      loadData();
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
